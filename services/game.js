@@ -1,96 +1,93 @@
 import { EmbedBuilder } from 'discord.js';
 import { proxyImage } from '../core/utils.js';
+import { getMarketOpenTime, getMarketDate } from '../core/time.js';
+import { isVotingOpen } from '../core/state.js';
+import { vote } from '../db/vote.js';
+import { redis } from '../db/redis.js';
 
-const userVotes = new Map(); // userId -> emoji
-let votingOpen = true;
+// Send at the end of the previous trading day.
+export async function sendVotingOpenAlert(channel) {
+    const guildId = channel.guildId;
 
-export const votes = userVotes;
+    // Fetch the previous active message ID from Redis
+    const prevMessageId = await redis.get(`active_vote_message:${guildId}`);
 
-export function closeVoting() {
-  votingOpen = false;
-}
+    if (prevMessageId) {
+        try {
+            const prevMessage = await channel.messages.fetch(prevMessageId);
+            await prevMessage.delete();
+            console.log(`🗑 Deleted old voting message for ${guildId}`);
+        } catch (err) {
+            console.warn(`⚠️ Could not delete previous vote message: ${err.message}`);
+        }
+    }
 
-export function openVoting() {
-  votingOpen = true;
-}
+    const date = new Date(getMarketDate());
+    const formatted = date.toLocaleDateString('en-US', {
+        year: '2-digit',
+        month: 'numeric',
+        day: 'numeric',
+    });
+    const relativeTime = getMarketOpenTime(true);
 
-export function resetVotes() {
-  userVotes.clear();
-  votingOpen = true;
-}
-
-const marketOpenUtc = new Date();
-marketOpenUtc.setUTCHours(13, 30, 0, 0); // 9:30AM ET = 13:30 UTC
-if (marketOpenUtc < new Date()) marketOpenUtc.setUTCDate(marketOpenUtc.getUTCDate() + 1); // move to next day if past
-
-const unixTimestamp = Math.floor(marketOpenUtc.getTime() / 1000); // convert to seconds
-const relativeTime = `<t:${unixTimestamp}:R>`; // Discord will show "in 4 hours"
-
-export async function sendMarketPoll(channel) {
-    console.log(`📊 Sending market poll to ${channel.name}...`);
     const embed = new EmbedBuilder()
-        .setTitle('📈 TendieTrend Market Prediction')
-        .setDescription('Will the market close green or red tomorrow?\n\n🟢 Green\n🔴 Red\n\nReact to vote!')
-        .setColor(0x5865F2)
-        .setImage(proxyImage('https://img.freepik.com/free-vector/green-uptrend-market_1017-9640.jpg?semt=ais_hybrid&w=740'))
-        .setFooter({ text: 'Poll closes at market open (9:30AM ET)' });
+        .setAuthor({
+            name: 'Voting Is Open.',
+            iconURL: 'https://raw.githubusercontent.com/ryntab/TendieTrend/refs/heads/master/assets/tendie_trend_Logo.png',
+        })
+        .setImage(proxyImage('https://bantanaoriginbucket.s3.us-east-1.amazonaws.com/screenshot-2025-04-11-20-27-37.png'))
+        .setDescription(`Voting for **${formatted}** is now **Open**.\n\nUse the reaction buttons to cast your vote for today's market direction.\n\nPolls close ${relativeTime}`)
+        .setColor(0x5f5f5f)
+        .setFooter({ text: 'TendieTrend' })
+        .setTimestamp();
 
     const message = await channel.send({ embeds: [embed] });
 
     await message.react('🟢');
     await message.react('🔴');
 
+    // Save active message ID in Redis
+    await redis.set(`active_vote_message:${guildId}`, message.id);
+
     return message;
-}
-
-// Send at the end of the previous trading day.
-export async function sendVotingOpenAlert(channel) {
-    console.log(`📢 Sending premarket alert to ${channel.name}...`);
-    let embed = new EmbedBuilder()
-        .setTitle('📈 Voting is open!')
-        .setDescription(`Be sure to cast your vote, the market opens soon. \n\n🕒 Voting ends <t:${unixTimestamp}:R>`)
-        .setColor(0x5f5f5f)
-        .setFooter({ text: 'Get ready!' });
-
-
-
-    await channel.send({ embeds: [embed] });
 }
 
 // Send 30 minutes before market open.
 export async function sendVotingClosingAlert(channel) {
-    console.log(`📢 Sending premarket alert to ${channel.name}...`);
     const embed = new EmbedBuilder()
-        .setTitle('📈 Cast your vote!')
-        .setDescription(`Be sure to cast your vote, the market opens soon. \n\n🕒 Voting ends <t:${unixTimestamp}:R>`)
+        .setAuthor({
+            name: "Market Opens Soon!",
+            iconURL: "https://raw.githubusercontent.com/ryntab/TendieTrend/refs/heads/master/assets/tendie_trend_Logo.png",
+        })
+        .setDescription(`Last chance to cast your vote for **Today**\n\n Polls close in **<t:${unixTimestamp}:R>**`)
+        .setImage(proxyImage("https://raw.githubusercontent.com/ryntab/TrumpBot/refs/heads/master/assets/Discord-Trump-Decoration-Alt.png"))
         .setColor(0xFFA500)
-        .setFooter({ text: 'Get ready!' });
+        .setTimestamp();
 
     await channel.send({ embeds: [embed] });
 }
 
 // Send at market open.
 export async function sendMarketOpenAlert(channel) {
-    console.log(`📢 Sending market open alert to ${channel.name}...`);
     const embed = new EmbedBuilder()
-        .setTitle('🚀 Market Open!')
-        .setDescription(`Will the market close green or red tomorrow?\n\n🟢 Green\n🔴 Red\n\nReact to vote!\n\n🕒 Voting ends <t:${unixTimestamp}:R>`)
-
+        .setAuthor({
+            name: "*Ding Ding* Market Open!",
+            iconURL: "https://raw.githubusercontent.com/ryntab/TendieTrend/refs/heads/master/assets/tendie_trend_Logo.png",
+        })
         .setColor(0x00FF00)
-        .setFooter({ text: `Voting ends ${relativeTime}` })
-
+        .setTimestamp();
     await channel.send({ embeds: [embed] });
 }
 
 // Send at market close.
 export async function sendMarketCloseAlert(channel) {
-    console.log(`📢 Sending market close alert to ${channel.name}...`);
     const embed = new EmbedBuilder()
-        .setTitle('⏰ Market Closed!')
-        .setDescription('The market is now closed! Winners will be announced tomorrow!')
-        .setColor(0xFF0000)
-        .setFooter({ text: 'See you tomorrow!' });
-
+        .setAuthor({
+            name: "*Ding Ding* Market Closed!",
+            iconURL: "https://raw.githubusercontent.com/ryntab/TendieTrend/refs/heads/master/assets/tendie_trend_Logo.png",
+        })
+        .setColor(0x00FF00)
+        .setTimestamp();
     await channel.send({ embeds: [embed] });
 }
 
@@ -98,37 +95,40 @@ export async function handleVote(reaction, user) {
     if (user.bot) return;
 
     const emoji = reaction.emoji.name;
+    const guildId = reaction.message.guildId;
+    if (!guildId) return;
 
-    // Remove any non-voting emoji
+    // Validate emoji
     if (!['🟢', '🔴'].includes(emoji)) {
-        try {
-            await reaction.users.remove(user.id);
-            console.log(`❌ Removed invalid emoji from ${user.tag}: ${emoji}`);
-        } catch (err) {
-            console.error('Failed to remove invalid emoji:', err);
-        }
+        await reaction.users.remove(user.id).catch(() => { });
+        console.log(`❌ Invalid emoji from ${user.tag}: ${emoji}`);
         return;
     }
 
-    if (!votingOpen) {
-        try {
-            await reaction.users.remove(user.id);
-            console.log(`⏰ Removed vote from ${user.tag} - voting is closed.`);
-        } catch (err) {
-            console.error('Failed to remove reaction:', err);
-        }
+    //Check voting status
+    if (!isVotingOpen(guildId)) {
+        await reaction.users.remove(user.id).catch(() => { });
+        console.log(`⏰ Voting closed — removed ${user.tag}'s reaction`);
         return;
     }
 
-    // Only allow one vote: remove other if exists
-    const previous = userVotes.get(user.id);
+    const voteRef = vote(guildId, user.id);
+
+    // Ensure it's the active message
+    const isValid = await voteRef.isFromActiveMessage(reaction.message.id);
+    if (!isValid) {
+        await reaction.users.remove(user.id).catch(() => { });
+        console.log(`🧽 Ignored stale vote from ${user.tag} on old message`);
+        return;
+    }
+
+    // Remove previous vote if different
+    const previous = await voteRef.get();
     if (previous && previous !== emoji) {
-        const otherReaction = reaction.message.reactions.cache.get(previous);
-        if (otherReaction) {
-            otherReaction.users.remove(user.id).catch(() => { });
-        }
+        const other = reaction.message.reactions.cache.get(previous);
+        if (other) await other.users.remove(user.id).catch(() => { });
     }
 
-    userVotes.set(user.id, emoji);
-    console.log(`✅ ${user.tag} voted ${emoji}`);
+    await voteRef.set(emoji);
+    console.log(`✅ ${user.tag} voted ${emoji} in ${guildId}`);
 }

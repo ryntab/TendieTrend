@@ -19,3 +19,16 @@ if (fs.existsSync(CHANNELS_PATH)) {
 export function proxyImage(url) {
   return 'https://images.weserv.nl/?url=' + encodeURIComponent(url.replace(/^https?:\/\//, ''));
 }
+
+
+export function convertEmojiToValue(emoji) {
+  if (emoji === '🟢') return 1;
+  if (emoji === '🔴') return 0;
+  throw new Error(`Invalid emoji: ${emoji}`);
+}
+
+export function convertValueToEmoji(value) {
+  if (value === '1' || value === 1) return '🟢';
+  if (value === '0' || value === 0) return '🔴';
+  return '?';
+}

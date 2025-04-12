@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en" class="bg-[#0f172a] text-white overflow-hidden">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Leaderboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="flex flex-col items-center justify-center font-sans px-8 py-16"
+  style="background: linear-gradient(0deg, rgb(17 21 33) 0%, rgb(17 23 41) 50%, rgb(26 36 67) 100%);"
+  cz-shortcut-listen="true">
+  <div class="flex flex-row items-center">
+    <img src="/assets/trophy.svg" alt="Logo" class="w-16 h-16 mr-4">
+    <h1 class="text-4xl font-bold text-white">Leader Board</h1>
+  </div>
+
+  <div class="relative overflow-x-auto w-full mt-8">
+    <table class="w-full text-sm text-left rtl:text-right text-gray-500 dark:text-gray-400">
+      <thead class="text-gray-700 uppercase bg-gray-700/10 dark:text-gray-400 text-xl">
+        <tr>
+          <th scope="col" class="px-6 py-3">
+            Rank
+          </th>
+          <th scope="col" class="px-6 py-3">
+            User
+          </th>
+          <th scope="col" class="px-6 py-3">
+            Correct Answers
+          </th>
+          <th scope="col" class="px-6 py-3">
+            Streak
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        <% entries.slice(0, 5).forEach((entry, index) => { %>
+          <tr class="border-b border-indigo-500 bg-indigo-800/10 text-2xl first:bg-indigo-900 first:text-indigo-200">
+            <th scope="row" class="pl-6 py-4 font-medium text-gray-900 whitespace-nowrap text-white/80 font-extrabold">
+              <% if (index > 2) { %>
+                <img src="/assets/ranks/<%= index + 1 %>.svg" alt="Rank" class="w-12 h-12 inline-block">
+              <% } else if (index <= 2) { %>
+                <img src="/assets/medals/<%= index + 1 %>.svg" alt="Medal" class="w-12 h-12 inline-block">
+              <% } %>
+            </th>
+            <th scope="row" class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">
+              @<%= entry.userId %>
+            </th>
+            <td class="px-6 py-4 font-extrabold text-white">
+              <%= entry.total_correct %>
+            </td>
+            <td class="px-6 py-4 font-extrabold text-white">
+              <%= entry.longest_streak %>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</body>
+</html>
