@@ -6,6 +6,8 @@ import { sendVotingOpenAlert, sendVotingClosingAlert, sendMarketCloseAlert, send
 import { evaluateVotesForGuild } from './tasks/evaluateVotes.js';
 import { getLeaderboard } from './tasks/getLeaderboard.js';
 
+import GuildsDB from './db/guilds.js';
+
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -36,9 +38,9 @@ client.once('ready', async () => {
   try {
     // await registerCommands();
     // getLeaderboard('test-guild'); // Replace with actual guild ID
-    const channel = await client.channels.fetch('1360323357626863848');
+    //const channel = await client.channels.fetch('1360323357626863848');
     // await evaluateVotesForGuild('test-guild');
-    await sendVotingOpenAlert(channel);
+    //await sendVotingOpenAlert(channel);
     // await sendVotingClosingAlert(channel);
     // await sendMarketOpenAlert(channel);
     // await sendMarketCloseAlert(channel);
@@ -64,5 +66,13 @@ client.on('messageReactionAdd', async (reaction, user) => {
     await handleVote(reaction, user);
   } catch (err) {
     console.error('❌ Error handling reaction:', err);
+  }
+});
+
+client.on('guildCreate', async (guild) => {
+  try {
+    await GuildsDB.markGuildAsManaged(guild);
+  } catch (err) {
+    console.error('❌ Error during guild creation:', err);
   }
 });
